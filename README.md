@@ -8,12 +8,11 @@ This repository includes some sample code for the ESP-IDF (for the
 ESP32) that lets the ESP32 control the Sphero.
 
 # References
-Thanks to `bbraun` on synack.net, whose page I stumbled across when I
+Thanks to `bbraun` on synack.net, whose blogs I stumbled across when I
 was trying to make a [Mac Plus keyboard
-interface](https://github.com/liamhays/mac-plus-serkey). The sidebar
-on that page included [this
-documentation](http://www.synack.net/~bbraun/spherodroid/), which
-linked to an [old Sphero
+interface](https://github.com/liamhays/mac-plus-serkey). One of them
+was [this documentation](http://www.synack.net/~bbraun/spherodroid/),
+which linked to an [old Sphero
 page](https://web.archive.org/web/20170618112259/http://sdk.sphero.com/api-reference/api-packet-format/),
 which has since been taken down but is on the Internet Archive. I was
 trying to do this mostly independently, and the Sphero docs provided
@@ -38,8 +37,7 @@ Sphero!!`" encoded in ASCII.
 
 
 ## Services and characteristics
-On connection, three services are available to access by the Bluetooth
-master:
+On connection, three services are available to the Bluetooth master:
 
 | UUID                                   | Service                                                   |
 |----------------------------------------|-----------------------------------------------------------|
@@ -58,18 +56,17 @@ characteristics, but only three total are needed:
 
 ## Maintaining connection
 While the Sphero will accept any connection request, it will
-disconnect after a few seconds if it is not kept alive. To do this,
-however, the connecting device must write certain packets to the wake
-characteristic. 
+disconnect after a few seconds if it is not attached and woken up. To
+attach the Sphero, the connecting device must write certain packets to
+the wake characteristic.
 
 First, the connecting device must send the attach packet, which tells
-the Sphero not to disconnect. Write `usetheforce...band` (18 bytes) to
-the wake characteristic with no response requested.
+the Sphero not to disconnect. Write "`usetheforce...band`" (18 bytes)
+to the wake characteristic with no response requested.
 
-Once the attach packet has been sent, the Sphero still hasn't
-activated the LED. Write the wake packet below (see "Data transfer"
-below for packet information) to the wake characteristic with a
-response requested:
+Once the attach packet has been sent, the Sphero must be woken. Write
+the wake packet below (see "Data transfer" below for packet
+information) to the wake characteristic with a response requested:
 
 | `SOP1` | `SOP2` | `DID`  | `CID`  | `SEQ`  | `CHK`  | `EOP`  |
 |--------|--------|--------|--------|--------|--------|--------|
@@ -83,17 +80,18 @@ Once the Sphero is connected, attached, and woken, it will stay
 connected until it reaches some inactivity timeout. I don't know how
 long that timeout is.
 
-After the timeout is reached, the Sphero will enter a state where the
-color of the RGB LED depends on the rotation of the Sphero. According
-to Sphero docs (which are still available on the Sphero site), the
-Sphero Mini will go to sleep after entering this state.
+After the timeout is reached, the Sphero will disconnect and remain
+on, then enter a state where the color of the RGB LED depends on the
+rotation of the Sphero. According to Sphero docs (which are still
+available on the Sphero site), the Sphero Mini will go to sleep after
+entering this state.
 
 (need to include link to those docs).
 
-If the Bluetooth master disconnects from the Sphero, the Sphero will
-enter this same rotation-dependent color mode. To sleep the Sphero,
-send these packets to the UART characteristic (again, for more info,
-see "Data transfer" below):
+If the Bluetooth master disconnects from the Sphero without sleeping
+the Sphero, the Sphero will enter this same rotation-dependent color
+mode. To sleep the Sphero, send these packets to the UART
+characteristic (again, for more info, see "Data transfer" below):
 
 | `SOP1` | `SOP2` | `DID`  | `CID`  | `SEQ` | `CHK` | `EOP`  |
 |--------|--------|--------|--------|-------|-------|--------|
@@ -111,7 +109,7 @@ I think the Sphero ignores the value of the `SEQ` field for these
 commands.
 
 Once these commands have been issued, the connection will linger for
-about 30 seconds until the Sphero terminates it. The host can
+about 30 seconds until the Sphero terminates it. The host can also
 terminate the connection, but it must do so with reason `0x13`,
 "Remote User Terminated Connection."
 
@@ -128,8 +126,8 @@ the form of a command packet. There may be commands that cause the
 Sphero to issue responses that include useful data.
 
 ## Packet format
-A packet can be any length, but follows a common format. Each byte
-is a *field*.
+A packet can be any length, but follows a common format. I refer to
+byte as a *field*.
 
 | `SOP1` | `SOP2` | `DID` | `CID` | `SEQ` | `packet data (variable length)` | `CHK` | `EOP` |
 
@@ -155,7 +153,7 @@ command. When `SEQ` reaches 255, it resets to 0. In this
 documentation, `seq` is used in the `SEQ` field to indicate a generic
 sequence number.
 
-`...` is the packet data. This can be any length.
+The packet data can be any length.
 
 `CHK` is a rudimentary checksum. It is calculated by summing every
 byte from `SOP2` to the final byte of the packet data, then ANDing
@@ -172,14 +170,13 @@ Bluetooth master.
 # Sphero features
 ## RGB LED
 The Sphero Mini has one RGB LED, in the center of the top PCB. Each
-base color can be controlled with 8-bit precision.
+base color (red, green, and blue) can be controlled with 8-bit precision.
 
-To set the color, issue this command (example values inserted as placeholders):
+To set the color, issue this command. Example values have been inserted as placeholders:
 
 | `SOP1` | `SOP2` | `DID`  | `CID`  | `SEQ` | ?      | ?      | `R`    | `G`    | `B`    | `R`    | `G`    | `B`    | `CHK` | `EOP`  |
 |--------|--------|--------|--------|-------|--------|--------|--------|--------|--------|--------|--------|--------|-------|--------|
 | `0x8d` | `0x0a` | `0x1a` | `0x0e` | `seq` | `0x00` | `0x7e` | `0x68` | `0x71` | `0xff` | `0x68` | `0x71` | `0xff` | `chk` | `0xd8` |
-`
 
 I have no idea what the question mark values indicate. However,
 leaving them at the values indicated in the table appears to work for
@@ -252,6 +249,7 @@ indicate that the Bluetooth master is still awake, two keep-alive
 packets must be sent every 10 seconds.
 
 The first packet is:
+
 | `SOP1` | `SOP2` | `DID`  | `CID`  | `SEQ` | `CHK` | `EOP`  |
 |--------|--------|--------|--------|-------|-------|--------|
 | `0x8d` | `0x0a` | `0x13` | `0x04` | `seq` | `chk` | `0xd8` |
@@ -274,4 +272,6 @@ response.
 # Final word
 The Sphero Mini is a comparatively simple Sphero robot (look at it
 versus the Bolt, for example), and even considering that, I don't
-think I have completely documented all the commands it supports.
+think I have completely documented all the commands it supports. I
+also suspect that the Sphero's responses contain plenty of useful
+information.
