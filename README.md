@@ -4,9 +4,6 @@ used by the Sphero Mini, and probably other Sphero robots. It is
 probably incomplete. You should already have a basic understanding of
 BLE advertising, services, and characteristics.
 
-This repository includes some sample code for the ESP-IDF (for the
-ESP32) that lets the ESP32 control the Sphero.
-
 # References
 Thanks to `bbraun` on synack.net, whose blogs I stumbled across when I
 was trying to make a [Mac Plus keyboard
